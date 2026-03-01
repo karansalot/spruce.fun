@@ -7,9 +7,10 @@
 
 # spruce.fun
 
-**Fully on-chain Central Limit Order Book (CLOB) on Solana** with an SPL token position system, a Rust-powered risk engine, dynamic leverage bands, quadratic-voting dispute resolution, and a roadmap to become **Solana's flagship native prediction market & primary oracle for perpetuals**.
+**Derivatives trading on real-world outcomes, built on Solana.** spruce.fun brings leverage to prediction markets — users take leveraged long or short positions on sports, crypto, and political events through a fully on-chain Central Limit Order Book, backed by a Rust risk engine and dynamic margin enforcement.
 
 ---
+
 
 ## Table of Contents
 
@@ -30,7 +31,9 @@
 
 ## Overview
 
-spruce.fun is a prediction-market-style trading platform where the entire order matching engine lives on-chain. Users deposit USDC as collateral, place limit or market orders, and receive SPL position tokens (LONG or SHORT) when their orders are matched. The system is complemented by an off-chain Rust risk engine that monitors positions in real time, computes dynamic leverage caps, and triggers a three-stage liquidation waterfall when margin thresholds are breached. A Node.js backend streams live Polymarket orderbook data and OHLCV candles to the frontend via WebSocket.
+spruce.fun is a derivatives platform that brings leverage to prediction markets. Instead of trading crypto spot or futures, users take leveraged long or short positions on real-world outcomes — sports results, crypto price events, political decisions — that resolve at 0¢ (No) or 100¢ (Yes).
+
+The matching engine is a fully on-chain CLOB deployed as an Anchor program on Solana. Users deposit USDC as collateral, place limit or market orders, and receive fungible SPL position tokens (LONG or SHORT) when orders are filled. A Node.js backend streams live market data and OHLCV candles from Polymarket. An off-chain Rust risk engine monitors all open positions in real time, enforces dynamic leverage caps based on distance to the price boundary, and executes a three-stage liquidation waterfall when maintenance margin is breached.
 
 ### Key Features
 

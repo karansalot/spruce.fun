@@ -1,0 +1,18 @@
+#!/bin/bash
+
+echo "🔄 Restarting Frontend with Updated Environment Variables"
+echo ""
+echo "Current environment configuration:"
+echo "  NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-$(grep NEXT_PUBLIC_API_URL .env | cut -d '=' -f2)}"
+echo "  NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-$(grep NEXT_PUBLIC_WS_URL .env | cut -d '=' -f2)}"
+echo ""
+echo "Press Ctrl+C in the terminal running 'npm run dev' to stop it,"
+echo "then run this command to restart:"
+echo ""
+echo "  npm run dev"
+echo ""
+echo "After restart, verify:"
+echo "  ✓ Browser console shows 'Connected to WebSocket'"
+echo "  ✓ Green connection indicator on team cards"
+echo "  ✓ Backend shows 'Broadcast: ... to 1 clients'"
+echo ""

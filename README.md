@@ -30,7 +30,7 @@
 
 ## Overview
 
-spruce.funis a prediction-market-style trading platform where the entire order matching engine lives on-chain. Users deposit USDC as collateral, place limit or market orders, and receive SPL position tokens (LONG or SHORT) when their orders are matched. The system is complemented by an off-chain Rust risk engine that monitors positions in real time, computes dynamic leverage caps, and triggers a three-stage liquidation waterfall when margin thresholds are breached.
+spruce.fun is a prediction-market-style trading platform where the entire order matching engine lives on-chain. Users deposit USDC as collateral, place limit or market orders, and receive SPL position tokens (LONG or SHORT) when their orders are matched. The system is complemented by an off-chain Rust risk engine that monitors positions in real time, computes dynamic leverage caps, and triggers a three-stage liquidation waterfall when margin thresholds are breached. A Node.js backend streams live Polymarket orderbook data and OHLCV candles to the frontend via WebSocket.
 
 ### Key Features
 
@@ -43,6 +43,7 @@ spruce.funis a prediction-market-style trading platform where the entire order m
 | **Rust Risk Engine** | Real-time margin monitoring at 500 ms sweeps with a three-stage liquidation waterfall (partial close, full close, ADL). |
 | **Insurance Fund** | Liquidation surpluses flow into a shared fund; deficits draw from it before socializing losses. |
 | **Quadratic Voting** | Settlement disputes are resolved on-chain via quadratic voting, preventing plutocratic capture. |
+| **Polymarket Data Feed** | Node.js WebSocket backend streams live orderbook snapshots and OHLCV candles from Polymarket. |
 | **Privy Auth** | Wallet, email, and social login via Privy — automatic chain switching to Solana Devnet. |
 
 ---
@@ -52,50 +53,45 @@ spruce.funis a prediction-market-style trading platform where the entire order m
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                          FRONTEND                               │
-│   Next.js 15  ·  React  ·  Tailwind  ·  Privy Auth  ·  viem    │
+│   Next.js 15  ·  React 19  ·  Tailwind  ·  Privy Auth          │
 │                                                                 │
-│   ┌───────────┐  ┌──────────────┐  ┌──────────────────────┐     │
-│   │ Market    │  │ Trading      │  │ Orderbook Display    │     │
-│   │ Cards     │  │ Panel        │  │ (on-chain polling)   │     │
-│   └───────────┘  └──────┬───────┘  └──────────┬───────────┘     │
-│                         │                     │                 │
-└─────────────────────────┼─────────────────────┼─────────────────┘
+│   ┌───────────┐  ┌──────────────┐  ┌──────────────────────┐    │
+│   │ Market    │  │ Trading      │  │ Orderbook Display    │    │
+│   │ Cards     │  │ Panel        │  │ (on-chain polling)   │    │
+│   └───────────┘  └──────┬───────┘  └──────────┬───────────┘    │
+│                         │                     │                │
+└─────────────────────────┼─────────────────────┼────────────────┘
                           │ sendTransaction     │ getAccountInfo
+                          │                     │ WebSocket (candles)
                           ▼                     ▼
+┌──────────────────────────────┐  ┌─────────────────────────────┐
+│        SOLANA DEVNET         │  │     BACKEND (Node.js)       │
+│                              │  │                             │
+│  ┌──────────────────────┐    │  │  Express 5 + WebSocket      │
+│  │  OnChainOrderBook    │    │  │                             │
+│  │  (Anchor Program)    │    │  │  ┌─────────────────────┐   │
+│  │                      │    │  │  │ Polymarket WS feed  │   │
+│  │  place_limit_order() │    │  │  │ Candle aggregation  │   │
+│  │  place_market_order()│    │  │  │ Orderbook snapshots │   │
+│  │  cancel_order()      │    │  │  │ Supabase persistence│   │
+│  │  settle()            │    │  │  └─────────────────────┘   │
+│  └──────────────────────┘    │  └─────────────────────────────┘
+└──────────────────────────────┘
+                 ▲
+                 │ price feed / position sync
+                 │
 ┌─────────────────────────────────────────────────────────────────┐
-│                        SOLANA DEVNET                             │
+│                      RISK ENGINE (Rust)                         │
 │                                                                 │
-│   ┌─────────────────────────────────────────────────────────┐   │
-│   │              OnChainOrderBook (Anchor Program)          │   │
-│   │                                                         │   │
-│   │  place_limit_order()  ──►  match_buy / match_sell       │   │
-│   │  place_market_order() ──►  execute (mint tokens)        │   │
-│   │  cancel_order()       ──►  refund locked USDC           │   │
-│   │                                                         │   │
-│   │  Collateral:  Buy  = price × qty × 1e6 / 10000         │   │
-│   │               Sell = (10000 − price) × qty × 1e6/10000 │   │
-│   └─────────────────────────────────────────────────────────┘   │
-│                                                                 │
-│   ┌─────────────────────────┐   ┌───────────────────────────┐   │
-│   │ USDC Token (SPL)        │   │ Settlement / QV Dispute   │   │
-│   │                         │   │ Resolution (planned)      │   │
-│   └─────────────────────────┘   └───────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-                          ▲
-                          │ price feed / position sync
-                          │
-┌─────────────────────────────────────────────────────────────────┐
-│                      RISK ENGINE (Rust)                          │
-│                                                                 │
-│   ┌────────────┐  ┌────────────┐  ┌────────────┐               │
-│   │  Margin    │  │  Dynamic   │  │  Liquidation│               │
-│   │  Calculator│  │  Leverage  │  │  Waterfall  │               │
-│   └──────┬─────┘  └──────┬─────┘  └──────┬──────┘              │
-│          │               │               │                      │
-│   ┌──────▼───────────────▼───────────────▼──────┐               │
-│   │           Position Monitor (500ms)          │               │
-│   │    PnL tracking  ·  Insurance fund mgmt     │               │
-│   └─────────────────────────────────────────────┘               │
+│   ┌────────────┐  ┌────────────┐  ┌─────────────┐              │
+│   │  Margin    │  │  Dynamic   │  │ Liquidation │              │
+│   │  Calculator│  │  Leverage  │  │  Waterfall  │              │
+│   └──────┬─────┘  └──────┬─────┘  └──────┬──────┘             │
+│          │               │               │                     │
+│   ┌──────▼───────────────▼───────────────▼──────┐              │
+│   │           Position Monitor (500ms)          │              │
+│   │    PnL tracking  ·  Insurance fund mgmt     │              │
+│   └─────────────────────────────────────────────┘              │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -142,6 +138,7 @@ Tokens are freely transferable and composable with the broader SPL token ecosyst
 | `place_limit_order(is_buy, price, qty)` | Place a resting limit order. Auto-matches if a crossing order exists. |
 | `place_market_order(is_buy, qty)` | IOC market order. Matches immediately; unfilled portion is refunded. |
 | `cancel_order(order_id)` | Cancel a resting order and reclaim locked USDC. |
+| `settle()` | Claim matched position tokens and any collateral refunds. |
 | `collateral(is_buy, price, qty)` | Pure function — compute required USDC for an order. |
 | `get_active_buy_orders()` | View all active buy orders on the book. |
 | `get_active_sell_orders()` | View all active sell orders on the book. |
@@ -233,7 +230,7 @@ Where MM = 50% of initial margin. If the computed liquidation price falls below 
 
 ## Quadratic Voting for Settlement Disputes
 
-spruce.funimplements a **quadratic voting** (QV) mechanism for resolving settlement disputes on-chain. This is used when the outcome of a market is contested — for example, when an oracle reports an ambiguous result.
+spruce.fun implements a **quadratic voting** (QV) mechanism for resolving settlement disputes on-chain. This is used when the outcome of a market is contested — for example, when an oracle reports an ambiguous result.
 
 ### How It Works
 
@@ -267,7 +264,7 @@ spruce.funimplements a **quadratic voting** (QV) mechanism for resolving settlem
 
 ### Quadratic Funding for Public Goods
 
-Beyond dispute resolution (quadratic voting), spruce.funwill implement **quadratic funding (QF)** to bootstrap and sustain public goods within the ecosystem:
+Beyond dispute resolution (quadratic voting), spruce.fun will implement **quadratic funding (QF)** to bootstrap and sustain public goods within the ecosystem:
 
 - **Market Creation Grants** — Anyone can propose a new prediction market. A matching pool funded by protocol fees amplifies small contributions from many users, so niche but valuable markets get funded even without whale backing.
 - **Oracle Bounties** — Quadratic funding incentivizes community members to build and maintain resolution sources (data feeds, attestation networks) for market settlement.
@@ -291,13 +288,13 @@ This means 100 people each contributing $1 generates **far more** matching than 
 
 ### Gasless Trading via Solana Fee Sponsorship
 
-Trading on-chain means every order, cancellation, and claim costs transaction fees. For mainstream adoption, that friction has to disappear. spruce.funwill integrate **transaction fee sponsorship** to cover fees for traders, making the experience feel as seamless as a centralized exchange.
+Trading on-chain means every order, cancellation, and claim costs transaction fees. For mainstream adoption, that friction has to disappear. spruce.fun will integrate **transaction fee sponsorship** to cover fees for traders, making the experience feel as seamless as a centralized exchange.
 
 ```
 ┌────────────┐      Signed Transaction      ┌──────────────┐
-│   Trader   │ ─────────────────────────▶  │   Fee Payer   │
-│  (no SOL   │   (signed intent,           │  (spruce.fun     │
-│   needed)  │    no fee payment)           │   sponsors)   │
+│   Trader   │ ─────────────────────────▶  │   Fee Payer  │
+│  (no SOL   │   (signed intent,           │  (spruce.fun  │
+│   needed)  │    no fee payment)           │   sponsors)  │
 └────────────┘                              └──────┬───────┘
                                                    │
                                                    ▼
@@ -310,17 +307,10 @@ Trading on-chain means every order, cancellation, and claim costs transaction fe
                           ▼                 ▼                  ▼
                   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
                   │  Fee Sponsor │  │  User Wallet  │  │  OnChain     │
-                  │  (spruce.fun    │  │               │  │  OrderBook   │
+                  │  (spruce.fun │  │               │  │  OrderBook   │
                   │   pays fees) │  │               │  │  Program     │
                   └──────────────┘  └──────────────┘  └──────────────┘
 ```
-
-**How it works:**
-
-1. **Fee Sponsorship** — A protocol-operated fee payer covers transaction costs for qualifying actions (order placement, cancellation, position claims). Funded by protocol revenue.
-2. **Sponsorship Policies** — Fee sponsorship can be tiered: free for the first N trades per day, volume-based unlocks, or token-holder perks. This prevents abuse while keeping the experience frictionless for real traders.
-
-**Why this matters:**
 
 | Without Fee Sponsorship | With Fee Sponsorship |
 |---|---|
@@ -351,10 +341,12 @@ Trading on-chain means every order, cancellation, and claim costs transaction fe
 |-------|-----------|
 | **Smart Contracts** | Rust, Anchor Framework |
 | **Blockchain** | Solana Devnet |
-| **Risk Engine** | Rust, Axum, Tokio, SQLx, DashMap |
-| **Frontend** | Next.js 15, React 19, TypeScript, Tailwind CSS |
+| **Risk Engine** | Rust, Axum, Tokio, SQLx (Postgres), DashMap |
+| **Backend** | Node.js, Express 5, WebSocket (ws), Supabase |
+| **Frontend** | Next.js 15, React 19, TypeScript, Tailwind CSS 4 |
 | **Wallet Auth** | Privy (wallet, email, Google login) |
-| **Chain Interaction** | @solana/web3.js, @coral-xyz/anchor |
+| **Chain Interaction** | @solana/web3.js, @coral-xyz/anchor, @solana/spl-token |
+| **Data Fetching** | TanStack Query, lightweight-charts |
 | **Collateral** | USDC (SPL Token) |
 
 ---
@@ -363,38 +355,62 @@ Trading on-chain means every order, cancellation, and claim costs transaction fe
 
 ```
 spruce.fun/
-├── contracts/                 # Anchor smart contracts (Rust)
+├── contracts/                 # Smart contracts
 │   └── solana/
-│       └── clob/              # On-chain CLOB program
+│       └── clob/              # Anchor CLOB program
 │           ├── programs/
-│           │   └── clob/src/  # Anchor program source
-│           └── tests/         # Program tests
+│           │   └── clob/src/  # Anchor program source (lib.rs)
+│           ├── scripts/       # Deployment & init scripts
+│           ├── tests/         # Program integration tests
+│           ├── Anchor.toml    # Anchor config
+│           └── Cargo.toml
 │
 ├── frontend/                  # Next.js trading interface
 │   ├── app/
-│   │   ├── components/        # Trading panel, orderbook, charts
+│   │   ├── components/        # Trading panel, orderbook, charts, etc.
+│   │   ├── hooks/             # useCLOBOrderbook, useWebSocket
 │   │   ├── market/[slug]/     # Individual market pages
 │   │   ├── clob/              # Direct CLOB interface
-│   │   └── api/               # Next.js API routes (Polymarket data)
+│   │   ├── providers/         # React context providers
+│   │   ├── types/             # TypeScript type definitions
+│   │   └── api/               # Next.js API routes
 │   ├── lib/
-│   │   ├── contracts.ts       # IDL + program interaction helpers
-│   │   └── constants.ts       # Chain config, USDC address
+│   │   ├── clob.ts            # CLOB program interaction helpers
+│   │   ├── constants.ts       # Chain config, USDC address, RPC endpoints
+│   │   ├── marketConfig.ts    # Market definitions
+│   │   ├── polymarketApi.ts   # Polymarket API client
+│   │   └── idl/               # Anchor IDL files
 │   └── package.json
 │
-├── risk_engine/               # Rust risk management service
-│   ├── src/
-│   │   ├── main.rs            # Axum server entrypoint
-│   │   ├── leverage.rs        # Dynamic leverage bands
-│   │   ├── margin.rs          # Margin & PnL calculations
-│   │   ├── liquidation.rs     # Three-stage liquidation waterfall
-│   │   ├── insurance.rs       # Insurance fund management
-│   │   ├── monitor.rs         # Real-time position monitor (500ms)
-│   │   ├── positions.rs       # Position CRUD
-│   │   ├── price_feed.rs      # WebSocket price stream
-│   │   └── config.rs          # Risk parameters
-│   └── Cargo.toml
+├── backend/                   # Node.js WebSocket + HTTP server
+│   ├── server.js              # Express + WebSocket entrypoint
+│   ├── config/
+│   │   └── marketConfig.js    # Market definitions & dynamic slugs
+│   ├── services/
+│   │   ├── state.js           # Shared in-memory state
+│   │   ├── db.js              # Supabase (Postgres) client
+│   │   ├── polymarketWsService.js   # Polymarket WebSocket subscription
+│   │   ├── polymarketApiService.js  # Polymarket REST API (snapshots, history)
+│   │   ├── orderbookService.js      # Orderbook state management
+│   │   ├── candleService.js         # OHLCV candle building & DB persistence
+│   │   ├── broadcastService.js      # WebSocket broadcasting to clients
+│   │   └── marketDataService.js     # Event metadata fetching
+│   └── package.json
 │
-└── backend/                   # Express.js API server
+└── risk_engine/               # Rust risk management service
+    ├── src/
+    │   ├── main.rs            # Axum server entrypoint
+    │   ├── leverage.rs        # Dynamic leverage bands
+    │   ├── margin.rs          # Margin & PnL calculations
+    │   ├── liquidation.rs     # Three-stage liquidation waterfall
+    │   ├── insurance.rs       # Insurance fund management
+    │   ├── monitor.rs         # Real-time position monitor (500ms)
+    │   ├── positions.rs       # Position CRUD
+    │   ├── price_feed.rs      # WebSocket price stream
+    │   ├── db.rs              # SQLx Postgres client
+    │   └── config.rs          # Risk parameters
+    ├── schema.sql             # Database schema
+    └── Cargo.toml
 ```
 
 ---
@@ -406,7 +422,7 @@ spruce.fun/
 - Node.js 18+
 - Rust 1.75+
 - Anchor CLI (`cargo install --git https://github.com/coral-xyz/anchor avm --locked`)
-- A wallet with SOL (Solana Devnet faucet) and USDC
+- A Solana wallet with SOL (Devnet faucet) and USDC
 
 ### 1. Clone & Install
 
@@ -424,17 +440,27 @@ cp .env.example .env   # Add your Privy App ID and program ID
 npm run dev
 ```
 
-### 3. Smart Contracts
+### 3. Backend
+
+```bash
+cd backend
+npm install
+cp .env.example .env   # Add Supabase URL/key and Polymarket config
+npm start
+```
+
+### 4. Smart Contracts
 
 ```bash
 cd contracts/solana/clob
+yarn install
 anchor build
 
 # Deploy (set wallet keypair)
 anchor deploy --provider.cluster devnet
 ```
 
-### 4. Risk Engine
+### 5. Risk Engine
 
 ```bash
 cd risk_engine
@@ -444,12 +470,14 @@ cargo run --release
 
 ### Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `NEXT_PUBLIC_PRIVY_APP_ID` | Privy application ID |
-| `NEXT_PUBLIC_CLOB_PROGRAM_ID` | Deployed CLOB program ID (see [Deployed Contracts](#deployed-contracts)) |
-| `NEXT_PUBLIC_CLOB_MARGIN_POOL` | (Optional) Margin pool token account for leveraged orders |
-| `ANCHOR_WALLET` | Path to deployer keypair (for program deployment only) |
+| Variable | Service | Description |
+|----------|---------|-------------|
+| `NEXT_PUBLIC_PRIVY_APP_ID` | Frontend | Privy application ID |
+| `NEXT_PUBLIC_CLOB_PROGRAM_ID` | Frontend | Deployed CLOB program ID |
+| `NEXT_PUBLIC_CLOB_MARGIN_POOL` | Frontend | (Optional) Margin pool token account |
+| `SUPABASE_URL` | Backend | Supabase project URL |
+| `SUPABASE_KEY` | Backend | Supabase service role key |
+| `ANCHOR_WALLET` | Contracts | Path to deployer keypair |
 
 ---
 
@@ -459,12 +487,11 @@ cargo run --release
 
 | Contract | Address |
 |----------|---------|
-| **CLOB Program** | `3gHH4MLVgTtbFGeuX3LCPFeSEEY6kuRPwmTKzsrAdP7k` |
+| **CLOB Program** | `FoUdTt3bhy7JrKqFk9Uqg6vJVa4MFqRe4PTwRgxWQggB` |
 | **Order Book (PDA)** | `DnrKJaYQv8NV5fTiL2zKhue7sPaefHvqB2TyzDEQtqG4` |
 | **USDC Mint (Devnet)** | `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU` |
 
-- **Order book PDA** is derived from seed `["orderbook"]` + program ID. Vault, LONG mint, and SHORT mint are PDAs derived from the order book. See `contracts/solana/clob/README.md` for init and deploy details.
-- Frontend default: `NEXT_PUBLIC_CLOB_PROGRAM_ID` is set to the CLOB program above in `frontend/lib/constants.ts`.
+The order book PDA is derived from seed `["orderbook"]` + program ID. Vault, LONG mint, and SHORT mint are PDAs derived from the order book. See `contracts/solana/clob/README.md` for init and deploy details.
 
 ---
 

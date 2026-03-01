@@ -1,0 +1,22 @@
+name: Test Workflow
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  test:
+    if: contains(github.event.comment.body, '@test')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Echo test
+        run: echo "Workflow is working!"
+
+      - name: Comment on PR
+        run: |
+          gh pr comment ${{ github.event.issue.number }} --body "Test workflow executed successfully!"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

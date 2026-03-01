@@ -215,26 +215,25 @@ app.post("/api/market/switch", async (req, res) => {
   }
 });
 
-// Hot wallet: receives and sends amounts for all trades (settlement). Configurable via HOT_WALLET_ADDRESS or YELLOW_PARTNER_ADDRESS.
+// Hot wallet: receives and sends amounts for all trades (settlement). Configurable via HOT_WALLET_ADDRESS.
 const HOT_WALLET_ADDRESS_DEFAULT = "0x4CbEe7aD42d33e9D3B41e8b6FAcA2f6f173C8A94";
 
-app.get("/api/yellow/partner-address", (req, res) => {
+app.get("/api/settlement/partner-address", (req, res) => {
   const partnerAddress =
     process.env.HOT_WALLET_ADDRESS ||
-    process.env.YELLOW_PARTNER_ADDRESS ||
     HOT_WALLET_ADDRESS_DEFAULT;
 
   res.json({
     partnerAddress,
-    network: process.env.YELLOW_NETWORK || "mainnet",
+    network: process.env.NETWORK || "mainnet",
   });
 });
 
 /**
- * Store Yellow session key when user connects wallet (for signature-less transactions).
+ * Store session key when user connects wallet (for signature-less transactions).
  * Session keys (including private key) stored in DB as source of truth instead of localStorage.
  */
-app.post("/api/yellow/session-key", async (req, res) => {
+app.post("/api/session-key", async (req, res) => {
   try {
     const {
       walletAddress,
@@ -278,11 +277,11 @@ app.post("/api/yellow/session-key", async (req, res) => {
 
     // Replace any existing session for this wallet
     await supabase
-      .from("yellow_session_keys")
+      .from("session_keys")
       .delete()
       .eq("wallet_address", wallet);
 
-    const { error } = await supabase.from("yellow_session_keys").insert({
+    const { error } = await supabase.from("session_keys").insert({
       wallet_address: wallet,
       session_key_address: sessionKeyAddress,
       session_key_private_key: sessionKeyPrivateKey,
@@ -309,7 +308,7 @@ app.post("/api/yellow/session-key", async (req, res) => {
   }
 });
 
-app.post("/api/yellow/payment", async (req, res) => {
+app.post("/api/payment", async (req, res) => {
   try {
     const { userAddress, amount, orderId, timestamp } = req.body;
 

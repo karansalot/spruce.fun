@@ -120,8 +120,8 @@ Active market is chosen by `DEFAULT_MARKET` env var (or first config). It can be
 - **Server:** `PORT` (WebSocket when using two ports), `HTTP_PORT`, `NODE_ENV`, `USE_SINGLE_PORT` (if set, one port for both HTTP and WS).
 - **Database:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (or anon keys). If both URL and key are set, DB is enabled and 1s candles are persisted.
 - **Market:** `DEFAULT_MARKET` – market `id` from `MARKET_CONFIGS`.
-- **Optional:** `DEBUG_CANDLE_GAPS=true` to log candle gaps; `YELLOW_NETWORK` for payment endpoint.
-- **Hot wallet (trade settlement):** `HOT_WALLET_ADDRESS` or `YELLOW_PARTNER_ADDRESS` – the wallet that receives and sends amounts for all trades. If unset, defaults to `0x4CbEe7aD42d33e9D3B41e8b6FAcA2f6f173C8A94`. Used by `GET /api/yellow/partner-address`.
+- **Optional:** `DEBUG_CANDLE_GAPS=true` to log candle gaps; `NETWORK` for payment endpoint.
+- **Hot wallet (trade settlement):** `HOT_WALLET_ADDRESS` – the wallet that receives and sends amounts for all trades. If unset, defaults to `0x4CbEe7aD42d33e9D3B41e8b6FAcA2f6f173C8A94`. Used by `GET /api/settlement/partner-address`.
 
 ---
 
@@ -151,8 +151,8 @@ Active market is chosen by `DEFAULT_MARKET` env var (or first config). It can be
 | GET    | `/api/markets`                     | List all configured markets and active id.                                                                                                                                                                                                               |
 | POST   | `/api/market/switch`               | Body: `{ marketId }`. Switches active market, re-subscribes WS, returns new market info.                                                                                                                                                                 |
 | GET    | `/api/candles/:outcome/:timeframe` | Query: `limit` (default 500). Returns `{ candles }` for outcome (1s from DB or aggregated 1m/5m/15m/1h from 1s; fallback to Polymarket history for non-1s if no DB data). Outcome is normalized (e.g. `up`, `down`). Timeframe: 1s, 1m, 5m, 15m, 1h, 1w. |
-| GET    | `/api/yellow/partner-address`      | Returns Yellow partner address and network (env or defaults).                                                                                                                                                                                            |
-| POST   | `/api/yellow/payment`              | Body: userAddress, amount, optional orderId, timestamp. Logs and can record payment if DB enabled.                                                                                                                                                       |
+| GET    | `/api/settlement/partner-address`  | Returns settlement partner address and network (env or defaults).                                                                                                                                                                                        |
+| POST   | `/api/payment`                     | Body: userAddress, amount, optional orderId, timestamp. Logs and can record payment if DB enabled.                                                                                                                                                       |
 | GET    | `/api/polymarket/events/:slug`     | Proxy to Gamma API event by slug.                                                                                                                                                                                                                        |
 | GET    | `/api/polymarket/prices-history`   | Query: `market`, `interval`, `fidelity`. Proxy to CLOB prices-history.                                                                                                                                                                                   |
 

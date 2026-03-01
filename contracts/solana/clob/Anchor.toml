@@ -1,0 +1,25 @@
+[toolchain]
+package_manager = "yarn"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.devnet]
+clob = "3gHH4MLVgTtbFGeuX3LCPFeSEEY6kuRPwmTKzsrAdP7k"
+
+[programs.localnet]
+clob = "3gHH4MLVgTtbFGeuX3LCPFeSEEY6kuRPwmTKzsrAdP7k"
+
+[programs.testnet]
+clob = "3gHH4MLVgTtbFGeuX3LCPFeSEEY6kuRPwmTKzsrAdP7k"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

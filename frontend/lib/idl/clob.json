@@ -1,5 +1,5 @@
 {
-  "address": "3gHH4MLVgTtbFGeuX3LCPFeSEEY6kuRPwmTKzsrAdP7k",
+  "address": "FoUdTt3bhy7JrKqFk9Uqg6vJVa4MFqRe4PTwRgxWQggB",
   "metadata": {
     "name": "clob",
     "version": "0.1.0",
@@ -10,7 +10,7 @@
     {
       "name": "cancel_order",
       "docs": [
-        "Cancel a resting limit order and reclaim collateral immediately."
+        "Cancel a resting limit order and reclaim individual margin immediately."
       ],
       "discriminator": [
         95,
@@ -66,11 +66,6 @@
               }
             ]
           }
-        },
-        {
-          "name": "margin_pool",
-          "writable": true,
-          "optional": true
         },
         {
           "name": "user_usdc",
@@ -238,7 +233,8 @@
       "docs": [
         "Place a resting limit order. Automatically matches against the book.",
         "Unmatched remainder rests on the book until cancelled.",
-        "leverage: 1 = full collateral, 2..=10 = margin only (1/leverage of notional); requires margin_pool when > 1."
+        "Each user posts their own initial margin = notional / leverage.",
+        "No shared pool required — individual margin model."
       ],
       "discriminator": [
         108,
@@ -296,14 +292,6 @@
           }
         },
         {
-          "name": "margin_pool",
-          "docs": [
-            "Margin pool (required when leverage > 1). Must match order_book.margin_pool."
-          ],
-          "writable": true,
-          "optional": true
-        },
-        {
           "name": "user_usdc",
           "writable": true
         },
@@ -338,7 +326,8 @@
     {
       "name": "place_market_order",
       "docs": [
-        "Place an IOC market order. Matches immediately; unfilled portion is refunded."
+        "Place an IOC market order. Matches immediately; unfilled portion is refunded.",
+        "Each user posts their own initial margin = notional / leverage."
       ],
       "discriminator": [
         90,
@@ -396,14 +385,6 @@
           }
         },
         {
-          "name": "margin_pool",
-          "docs": [
-            "Margin pool (required when leverage > 1). Must match order_book.margin_pool."
-          ],
-          "writable": true,
-          "optional": true
-        },
-        {
           "name": "user_usdc",
           "writable": true
         },
@@ -430,61 +411,6 @@
           "type": "u8"
         }
       ]
-    },
-    {
-      "name": "set_margin_pool",
-      "docs": [
-        "Set the margin pool for leveraged orders. Authority only. Pool must be a token account with authority = order_book PDA."
-      ],
-      "discriminator": [
-        8,
-        220,
-        88,
-        242,
-        222,
-        31,
-        20,
-        200
-      ],
-      "accounts": [
-        {
-          "name": "order_book",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  111,
-                  114,
-                  100,
-                  101,
-                  114,
-                  98,
-                  111,
-                  111,
-                  107
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "margin_pool",
-          "docs": [
-            "Token account holding USDC; must have authority = order_book PDA so program can transfer from it."
-          ],
-          "writable": true
-        },
-        {
-          "name": "authority",
-          "signer": true,
-          "relations": [
-            "order_book"
-          ]
-        }
-      ],
-      "args": []
     },
     {
       "name": "settle",
@@ -749,11 +675,6 @@
       "code": 6011,
       "name": "InvalidLeverage",
       "msg": "Leverage must be between 1 and 10"
-    },
-    {
-      "code": 6012,
-      "name": "MarginPoolRequired",
-      "msg": "Margin pool not set or insufficient for leveraged order"
     }
   ],
   "types": [
@@ -849,10 +770,6 @@
           {
             "name": "vault_bump",
             "type": "u8"
-          },
-          {
-            "name": "margin_pool",
-            "type": "pubkey"
           },
           {
             "name": "buy_orders",

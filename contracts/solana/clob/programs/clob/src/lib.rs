@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, MintTo, Token, TokenAccount, Transfer};
 
-declare_id!("3gHH4MLVgTtbFGeuX3LCPFeSEEY6kuRPwmTKzsrAdP7k");
+declare_id!("FoUdTt3bhy7JrKqFk9Uqg6vJVa4MFqRe4PTwRgxWQggB");
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -41,8 +41,6 @@ pub enum ClobError {
     NoCredits,
     #[msg("Leverage must be between 1 and 10")]
     InvalidLeverage,
-    #[msg("Margin pool not set or insufficient for leveraged order")]
-    MarginPoolRequired,
 }
 
 // ─── Data structures ─────────────────────────────────────────────────────────
@@ -55,10 +53,10 @@ pub struct Order {
     pub price: u64,        // 8  (basis points, 1–9999)
     pub quantity: u64,     // 8  (shares)
     pub filled: u64,       // 8
-    pub locked_usdc: u64,  // 8  (margin locked)
+    pub locked_usdc: u64,  // 8  (initial margin locked)
     pub timestamp: i64,    // 8
     pub active: bool,      // 1
-    pub leverage: u8,      // 1  (1 = no leverage, 2..=10 = 2x..10x)
+    pub leverage: u8,      // 1  (1 = no leverage, 2..=10 = leveraged)
 } // Total: 83 bytes
 
 impl Order {
@@ -109,7 +107,6 @@ pub struct OrderBook {
     pub long_mint_bump: u8,                 // 1
     pub short_mint_bump: u8,                // 1
     pub vault_bump: u8,                     // 1
-    pub margin_pool: Pubkey,                // 32 (token account for leveraged margin; default = zero)
     pub buy_orders: Vec<Order>,             // 4 + MAX_BUY_ORDERS  * Order::LEN
     pub sell_orders: Vec<Order>,            // 4 + MAX_SELL_ORDERS * Order::LEN
     pub user_positions: Vec<UserPosition>,  // 4 + MAX_POSITIONS   * UserPosition::LEN
@@ -122,7 +119,6 @@ impl OrderBook {
         + (4 + 32)                                            // symbol (max 32 chars)
         + 8                                                   // next_order_id
         + 1 + 1 + 1 + 1                                      // bumps
-        + 32                                                  // margin_pool
         + (4 + MAX_BUY_ORDERS  * Order::LEN)
         + (4 + MAX_SELL_ORDERS * Order::LEN)
         + (4 + MAX_POSITIONS   * UserPosition::LEN)
@@ -232,10 +228,6 @@ pub struct PlaceOrder<'info> {
     )]
     pub usdc_vault: Account<'info, TokenAccount>,
 
-    /// Margin pool (required when leverage > 1). Must match order_book.margin_pool.
-    #[account(mut)]
-    pub margin_pool: Option<Account<'info, TokenAccount>>,
-
     #[account(mut)]
     pub user_usdc: Account<'info, TokenAccount>,
 
@@ -260,9 +252,6 @@ pub struct CancelOrder<'info> {
         token::authority = order_book,
     )]
     pub usdc_vault: Account<'info, TokenAccount>,
-
-    #[account(mut)]
-    pub margin_pool: Option<Account<'info, TokenAccount>>,
 
     #[account(mut)]
     pub user_usdc: Account<'info, TokenAccount>,
@@ -317,27 +306,6 @@ pub struct Settle<'info> {
 
     pub user: Signer<'info>,
     pub token_program: Program<'info, Token>,
-}
-
-#[derive(Accounts)]
-pub struct SetMarginPool<'info> {
-    #[account(
-        mut,
-        seeds = [b"orderbook"],
-        bump = order_book.bump,
-        has_one = authority,
-    )]
-    pub order_book: Account<'info, OrderBook>,
-
-    /// Token account holding USDC; must have authority = order_book PDA so program can transfer from it.
-    #[account(
-        mut,
-        constraint = margin_pool.mint == order_book.usdc_mint,
-        constraint = margin_pool.owner == order_book.key(),
-    )]
-    pub margin_pool: Account<'info, TokenAccount>,
-
-    pub authority: Signer<'info>,
 }
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
@@ -398,24 +366,26 @@ fn execute_match(
     ob.buy_orders[buy_idx].filled += match_qty;
     ob.sell_orders[sell_idx].filled += match_qty;
 
-    // Buyer reserved at buy.price, pays exec_price → gets refund of difference
+    // Buyer reserved at buy.price, pays exec_price → refund capped at user's margin
+    let buy_lev = ob.buy_orders[buy_idx].leverage.max(1) as u64;
     let buy_reserved = (buy_price as u128 * match_qty as u128 * USDC_UNIT as u128
         / PRICE_PRECISION as u128) as u64;
     let buy_actual = (exec_price as u128 * match_qty as u128 * USDC_UNIT as u128
         / PRICE_PRECISION as u128) as u64;
-    let buy_refund = buy_reserved.saturating_sub(buy_actual);
+    // Cap refund at user's actual margin contribution (individual margin, no pool)
+    let buy_refund = buy_reserved.saturating_sub(buy_actual).min(buy_reserved / buy_lev);
 
-    // Seller reserved at (1 - sell.price), pays (1 - exec_price) → gets refund
+    // Seller reserved at (1 - sell.price), refund capped at user's margin
+    let sell_lev = ob.sell_orders[sell_idx].leverage.max(1) as u64;
     let sell_reserved = ((PRICE_PRECISION - sell_price) as u128
         * match_qty as u128 * USDC_UNIT as u128
         / PRICE_PRECISION as u128) as u64;
     let sell_actual = ((PRICE_PRECISION - exec_price) as u128
         * match_qty as u128 * USDC_UNIT as u128
         / PRICE_PRECISION as u128) as u64;
-    let sell_refund = sell_reserved.saturating_sub(sell_actual);
+    // Cap refund at user's actual margin contribution (individual margin, no pool)
+    let sell_refund = sell_reserved.saturating_sub(sell_actual).min(sell_reserved / sell_lev);
 
-    let buy_lev = ob.buy_orders[buy_idx].leverage.max(1) as u64;
-    let sell_lev = ob.sell_orders[sell_idx].leverage.max(1) as u64;
     ob.buy_orders[buy_idx].locked_usdc =
         ob.buy_orders[buy_idx].locked_usdc.saturating_sub(buy_reserved / buy_lev);
     ob.sell_orders[sell_idx].locked_usdc =
@@ -588,7 +558,6 @@ pub mod clob {
         ob.long_mint_bump = ctx.bumps.long_mint;
         ob.short_mint_bump = ctx.bumps.short_mint;
         ob.vault_bump = ctx.bumps.usdc_vault;
-        ob.margin_pool = Pubkey::default();
         ob.buy_orders = Vec::new();
         ob.sell_orders = Vec::new();
         ob.user_positions = Vec::new();
@@ -597,15 +566,10 @@ pub mod clob {
         Ok(())
     }
 
-    /// Set the margin pool for leveraged orders. Authority only. Pool must be a token account with authority = order_book PDA.
-    pub fn set_margin_pool(ctx: Context<SetMarginPool>) -> Result<()> {
-        ctx.accounts.order_book.margin_pool = ctx.accounts.margin_pool.key();
-        Ok(())
-    }
-
     /// Place a resting limit order. Automatically matches against the book.
     /// Unmatched remainder rests on the book until cancelled.
-    /// leverage: 1 = full collateral, 2..=10 = margin only (1/leverage of notional); requires margin_pool when > 1.
+    /// Each user posts their own initial margin = notional / leverage.
+    /// No shared pool required — individual margin model.
     pub fn place_limit_order(
         ctx: Context<PlaceOrder>,
         is_buy: bool,
@@ -623,37 +587,11 @@ pub mod clob {
         let notional = calc_collateral(is_buy, price, qty)?;
         require!(notional > 0, ClobError::CollateralTooSmall);
 
+        // User posts only their initial margin (notional / leverage)
         let margin = notional / (leverage as u64);
         require!(margin > 0, ClobError::CollateralTooSmall);
 
-        if leverage > 1 {
-            let pool_needed = notional - margin;
-            require!(pool_needed > 0, ClobError::MarginPoolRequired);
-            let ob = &ctx.accounts.order_book;
-            require!(ob.margin_pool != Pubkey::default(), ClobError::MarginPoolRequired);
-            let pool = ctx
-                .accounts
-                .margin_pool
-                .as_ref()
-                .ok_or(error!(ClobError::MarginPoolRequired))?;
-            require!(pool.key() == ob.margin_pool, ClobError::MarginPoolRequired);
-            require!(pool.amount >= pool_needed, ClobError::MarginPoolRequired);
-            let seeds = &[b"orderbook".as_ref(), &[ob.bump]];
-            let signer_seeds = &[&seeds[..]];
-            token::transfer(
-                CpiContext::new_with_signer(
-                    ctx.accounts.token_program.to_account_info(),
-                    Transfer {
-                        from: pool.to_account_info(),
-                        to: ctx.accounts.usdc_vault.to_account_info(),
-                        authority: ob.to_account_info(),
-                    },
-                    signer_seeds,
-                ),
-                pool_needed,
-            )?;
-        }
-
+        // Transfer user's individual margin to vault
         token::transfer(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
@@ -720,6 +658,7 @@ pub mod clob {
     }
 
     /// Place an IOC market order. Matches immediately; unfilled portion is refunded.
+    /// Each user posts their own initial margin = notional / leverage.
     pub fn place_market_order(
         ctx: Context<PlaceOrder>,
         is_buy: bool,
@@ -736,37 +675,11 @@ pub mod clob {
         let notional = calc_collateral(is_buy, worst_price, qty)?;
         require!(notional > 0, ClobError::CollateralTooSmall);
 
+        // User posts only their initial margin (notional / leverage)
         let margin = notional / (leverage as u64);
         require!(margin > 0, ClobError::CollateralTooSmall);
 
-        if leverage > 1 {
-            let pool_needed = notional - margin;
-            require!(pool_needed > 0, ClobError::MarginPoolRequired);
-            let ob = &ctx.accounts.order_book;
-            require!(ob.margin_pool != Pubkey::default(), ClobError::MarginPoolRequired);
-            let pool = ctx
-                .accounts
-                .margin_pool
-                .as_ref()
-                .ok_or(error!(ClobError::MarginPoolRequired))?;
-            require!(pool.key() == ob.margin_pool, ClobError::MarginPoolRequired);
-            require!(pool.amount >= pool_needed, ClobError::MarginPoolRequired);
-            let seeds = &[b"orderbook".as_ref(), &[ob.bump]];
-            let signer_seeds = &[&seeds[..]];
-            token::transfer(
-                CpiContext::new_with_signer(
-                    ctx.accounts.token_program.to_account_info(),
-                    Transfer {
-                        from: pool.to_account_info(),
-                        to: ctx.accounts.usdc_vault.to_account_info(),
-                        authority: ob.to_account_info(),
-                    },
-                    signer_seeds,
-                ),
-                pool_needed,
-            )?;
-        }
-
+        // Transfer user's individual margin to vault
         token::transfer(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
@@ -815,26 +728,6 @@ pub mod clob {
                 ob.buy_orders[idx].locked_usdc -= refund_margin;
                 ob.buy_orders[idx].active = false;
                 credit_position(ob, trader, 0, 0, refund_margin)?;
-                if leverage > 1 {
-                    let refund_pool = unfilled_notional.saturating_sub(refund_margin);
-                    if refund_pool > 0 {
-                        let pool = ctx.accounts.margin_pool.as_ref().unwrap();
-                        let seeds = &[b"orderbook".as_ref(), &[ob.bump]];
-                        let signer_seeds = &[&seeds[..]];
-                        token::transfer(
-                            CpiContext::new_with_signer(
-                                ctx.accounts.token_program.to_account_info(),
-                                Transfer {
-                                    from: ctx.accounts.usdc_vault.to_account_info(),
-                                    to: pool.to_account_info(),
-                                    authority: ob.to_account_info(),
-                                },
-                                signer_seeds,
-                            ),
-                            refund_pool,
-                        )?;
-                    }
-                }
             }
             ob.buy_orders.swap_remove(idx);
         } else {
@@ -864,26 +757,6 @@ pub mod clob {
                 ob.sell_orders[idx].locked_usdc -= refund_margin;
                 ob.sell_orders[idx].active = false;
                 credit_position(ob, trader, 0, 0, refund_margin)?;
-                if leverage > 1 {
-                    let refund_pool = unfilled_notional.saturating_sub(refund_margin);
-                    if refund_pool > 0 {
-                        let pool = ctx.accounts.margin_pool.as_ref().unwrap();
-                        let seeds = &[b"orderbook".as_ref(), &[ob.bump]];
-                        let signer_seeds = &[&seeds[..]];
-                        token::transfer(
-                            CpiContext::new_with_signer(
-                                ctx.accounts.token_program.to_account_info(),
-                                Transfer {
-                                    from: ctx.accounts.usdc_vault.to_account_info(),
-                                    to: pool.to_account_info(),
-                                    authority: ob.to_account_info(),
-                                },
-                                signer_seeds,
-                            ),
-                            refund_pool,
-                        )?;
-                    }
-                }
             }
             ob.sell_orders.swap_remove(idx);
         }
@@ -899,62 +772,44 @@ pub mod clob {
         Ok(())
     }
 
-    /// Cancel a resting limit order and reclaim collateral immediately.
+    /// Cancel a resting limit order and reclaim individual margin immediately.
     pub fn cancel_order(ctx: Context<CancelOrder>, order_id: u64) -> Result<()> {
         let user = ctx.accounts.user.key();
         let bump = ctx.accounts.order_book.bump;
 
-        let (refund_user, refund_pool, had_leverage) = {
+        let refund_user = {
             let ob = &mut ctx.accounts.order_book;
 
             if let Some(idx) = ob.buy_orders.iter().position(|o| o.id == order_id) {
                 let (active, trader, price, qty, filled, locked, leverage) = {
                     let o = &ob.buy_orders[idx];
-                    (
-                        o.active,
-                        o.trader,
-                        o.price,
-                        o.quantity,
-                        o.filled,
-                        o.locked_usdc,
-                        o.leverage.max(1),
-                    )
+                    (o.active, o.trader, o.price, o.quantity, o.filled, o.locked_usdc, o.leverage.max(1))
                 };
                 require!(active, ClobError::OrderNotActive);
                 require!(trader == user, ClobError::NotOrderOwner);
                 let unfilled = qty - filled;
                 let unfilled_notional = calc_collateral(true, price, unfilled)?;
-                let refund_user = unfilled_notional
+                let refund = unfilled_notional
                     .checked_div(leverage as u64)
                     .unwrap_or(0)
                     .min(locked);
-                let refund_pool = unfilled_notional.saturating_sub(refund_user);
                 ob.buy_orders.swap_remove(idx);
-                (refund_user, refund_pool, leverage > 1)
+                refund
             } else if let Some(idx) = ob.sell_orders.iter().position(|o| o.id == order_id) {
                 let (active, trader, price, qty, filled, locked, leverage) = {
                     let o = &ob.sell_orders[idx];
-                    (
-                        o.active,
-                        o.trader,
-                        o.price,
-                        o.quantity,
-                        o.filled,
-                        o.locked_usdc,
-                        o.leverage.max(1),
-                    )
+                    (o.active, o.trader, o.price, o.quantity, o.filled, o.locked_usdc, o.leverage.max(1))
                 };
                 require!(active, ClobError::OrderNotActive);
                 require!(trader == user, ClobError::NotOrderOwner);
                 let unfilled = qty - filled;
                 let unfilled_notional = calc_collateral(false, price, unfilled)?;
-                let refund_user = unfilled_notional
+                let refund = unfilled_notional
                     .checked_div(leverage as u64)
                     .unwrap_or(0)
                     .min(locked);
-                let refund_pool = unfilled_notional.saturating_sub(refund_user);
                 ob.sell_orders.swap_remove(idx);
-                (refund_user, refund_pool, leverage > 1)
+                refund
             } else {
                 return err!(ClobError::OrderNotFound);
             }
@@ -962,26 +817,6 @@ pub mod clob {
 
         let seeds = &[b"orderbook".as_ref(), &[bump]];
         let signer_seeds = &[&seeds[..]];
-
-        if refund_pool > 0 && had_leverage {
-            let pool = ctx
-                .accounts
-                .margin_pool
-                .as_ref()
-                .ok_or(error!(ClobError::MarginPoolRequired))?;
-            token::transfer(
-                CpiContext::new_with_signer(
-                    ctx.accounts.token_program.to_account_info(),
-                    Transfer {
-                        from: ctx.accounts.usdc_vault.to_account_info(),
-                        to: pool.to_account_info(),
-                        authority: ctx.accounts.order_book.to_account_info(),
-                    },
-                    signer_seeds,
-                ),
-                refund_pool,
-            )?;
-        }
 
         if refund_user > 0 {
             token::transfer(

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import Link from 'next/link';
 import { getConnection, createProgram, placeLimitOrder, placeMarketOrder, explorerTxUrl } from '../../lib/clob';
-import { CLOB_PROGRAM_ID, CLOB_MARGIN_POOL, USDC_MINT_DEVNET } from '../../lib/constants';
+import { CLOB_PROGRAM_ID, USDC_MINT_DEVNET } from '../../lib/constants';
 import { getAssociatedTokenAddressSync } from '@solana/spl-token';
 import { PublicKey } from '@solana/web3.js';
 
@@ -62,13 +62,13 @@ export default function EnhancedTradingPanel({
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
   const [amount, setAmount] = useState('');
   const [limitPrice, setLimitPrice] = useState('');
-  const [leverage, setLeverage] = useState(1);
+  const [leverage, setLeverage] = useState(2);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string; txHash?: string } | null>(null);
   const [orderTypeDropdownOpen, setOrderTypeDropdownOpen] = useState(false);
   const [leverageDropdownOpen, setLeverageDropdownOpen] = useState(false);
 
-  const LEVERAGE_OPTIONS = [1, 2, 3, 4, 5] as const;
+  const LEVERAGE_OPTIONS = [2, 3, 4, 5, 10] as const;
 
   // Get current price based on side and market type
   const getCurrentPrice = () => {
@@ -185,14 +185,10 @@ export default function EnhancedTradingPanel({
       setMessage({ type: 'error', text: 'Enter a quantity greater than 0.' });
       return;
     }
-    // Margin trading: user enters margin (e.g. 1 share), pays amount × price; order book shows leveraged size (amount × leverage).
+    // User enters base amount; leveraged order qty = amount × leverage (shown in orderbook).
+    // User only pays initial margin = notional / leverage (individual margin, no shared pool).
     const lev = Math.min(10, Math.max(1, leverage));
     const orderQty = Math.max(1, Math.round(amountNum * lev));
-    const marginPoolPubkey = CLOB_MARGIN_POOL ? new PublicKey(CLOB_MARGIN_POOL) : undefined;
-    if (lev > 1 && !marginPoolPubkey) {
-      setMessage({ type: 'error', text: 'Leverage > 1 requires NEXT_PUBLIC_CLOB_MARGIN_POOL to be set (margin pool pubkey).' });
-      return;
-    }
 
     if (orderType === 'limit') {
       const priceNum = parseFloat(limitPrice);
@@ -219,12 +215,12 @@ export default function EnhancedTradingPanel({
       const isBuy = side === 'long';
 
       if (orderType === 'market') {
-        const sig = await placeMarketOrder(program, userUsdc, isBuy, BigInt(orderQty), lev, marginPoolPubkey);
+        const sig = await placeMarketOrder(program, userUsdc, isBuy, BigInt(orderQty), lev);
         setMessage({ type: 'success', text: `Market ${isBuy ? 'buy' : 'sell'} order submitted!`, txHash: sig });
         setAmount('');
       } else {
         const priceBp = BigInt(Math.round(parseFloat(limitPrice) * 100));
-        const sig = await placeLimitOrder(program, userUsdc, isBuy, priceBp, BigInt(orderQty), lev, marginPoolPubkey);
+        const sig = await placeLimitOrder(program, userUsdc, isBuy, priceBp, BigInt(orderQty), lev);
         setMessage({ type: 'success', text: `Limit ${isBuy ? 'buy' : 'sell'} order placed!`, txHash: sig });
         setLimitPrice('');
         setAmount('');
@@ -465,7 +461,7 @@ export default function EnhancedTradingPanel({
             )}
             {totalCostFormatted !== null && (
               <p className="text-[10px] text-gray-400 dark:text-[#666] text-right mt-0.5">
-                You pay this (Limit price × Amount). Leverage is for display only.
+                Initial margin only. {leverage > 1 ? `${leverage}x leveraged position = ${Math.round((parseFloat(amount) || 0) * leverage)} shares in book.` : ''}
               </p>
             )}
           </div>

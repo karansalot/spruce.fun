@@ -188,23 +188,18 @@ export async function placeLimitOrder(
   priceBp: bigint,
   qty: bigint,
   leverage: number = 1,
-  marginPoolPubkey?: PublicKey
 ): Promise<string> {
   const orderBookPda = getOrderBookPda();
   const vaultPda = getVaultPda(orderBookPda);
-  const accounts: Record<string, PublicKey> = {
-    orderBook: orderBookPda,
-    usdcVault: vaultPda,
-    userUsdc,
-    user: (program.provider as AnchorProvider).publicKey,
-    tokenProgram: TOKEN_PROGRAM_ID,
-  };
-  if (leverage > 1 && marginPoolPubkey) {
-    accounts.marginPool = marginPoolPubkey;
-  }
   const tx = await program.methods
     .placeLimitOrder(isBuy, new BN(priceBp.toString()), new BN(qty.toString()), leverage)
-    .accounts(accounts as any)
+    .accounts({
+      orderBook: orderBookPda,
+      usdcVault: vaultPda,
+      userUsdc,
+      user: (program.provider as AnchorProvider).publicKey,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    } as any)
     .rpc();
   return tx;
 }
@@ -215,23 +210,18 @@ export async function placeMarketOrder(
   isBuy: boolean,
   qty: bigint,
   leverage: number = 1,
-  marginPoolPubkey?: PublicKey
 ): Promise<string> {
   const orderBookPda = getOrderBookPda();
   const vaultPda = getVaultPda(orderBookPda);
-  const accounts: Record<string, PublicKey> = {
-    orderBook: orderBookPda,
-    usdcVault: vaultPda,
-    userUsdc,
-    user: (program.provider as AnchorProvider).publicKey,
-    tokenProgram: TOKEN_PROGRAM_ID,
-  };
-  if (leverage > 1 && marginPoolPubkey) {
-    accounts.marginPool = marginPoolPubkey;
-  }
   const tx = await program.methods
     .placeMarketOrder(isBuy, new BN(qty.toString()), leverage)
-    .accounts(accounts as any)
+    .accounts({
+      orderBook: orderBookPda,
+      usdcVault: vaultPda,
+      userUsdc,
+      user: (program.provider as AnchorProvider).publicKey,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    } as any)
     .rpc();
   return tx;
 }
@@ -240,23 +230,18 @@ export async function cancelOrder(
   program: Program,
   userUsdc: PublicKey,
   orderId: bigint,
-  marginPoolPubkey?: PublicKey
 ): Promise<string> {
   const orderBookPda = getOrderBookPda();
   const vaultPda = getVaultPda(orderBookPda);
-  const accounts: Record<string, PublicKey> = {
-    orderBook: orderBookPda,
-    usdcVault: vaultPda,
-    userUsdc,
-    user: (program.provider as AnchorProvider).publicKey,
-    tokenProgram: TOKEN_PROGRAM_ID,
-  };
-  if (marginPoolPubkey) {
-    accounts.marginPool = marginPoolPubkey;
-  }
   const tx = await program.methods
     .cancelOrder(new BN(orderId.toString()))
-    .accounts(accounts as any)
+    .accounts({
+      orderBook: orderBookPda,
+      usdcVault: vaultPda,
+      userUsdc,
+      user: (program.provider as AnchorProvider).publicKey,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    } as any)
     .rpc();
   return tx;
 }

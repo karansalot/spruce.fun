@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js" />
 </p>
 
-# Derive
+# spruce.fun
 
 **Fully on-chain Central Limit Order Book (CLOB) on Solana** with an SPL token position system, a Rust-powered risk engine, dynamic leverage bands, quadratic-voting dispute resolution, and a roadmap to become **Solana's flagship native prediction market & primary oracle for perpetuals**.
 
@@ -30,7 +30,7 @@
 
 ## Overview
 
-Derive is a prediction-market-style trading platform where the entire order matching engine lives on-chain. Users deposit USDC as collateral, place limit or market orders, and receive SPL position tokens (LONG or SHORT) when their orders are matched. The system is complemented by an off-chain Rust risk engine that monitors positions in real time, computes dynamic leverage caps, and triggers a three-stage liquidation waterfall when margin thresholds are breached.
+spruce.funis a prediction-market-style trading platform where the entire order matching engine lives on-chain. Users deposit USDC as collateral, place limit or market orders, and receive SPL position tokens (LONG or SHORT) when their orders are matched. The system is complemented by an off-chain Rust risk engine that monitors positions in real time, computes dynamic leverage caps, and triggers a three-stage liquidation waterfall when margin thresholds are breached.
 
 ### Key Features
 
@@ -125,16 +125,6 @@ User places order
           │ tokens   │            └──────────────┘
           └──────────┘
 ```
-
-### Price System
-
-Prices are expressed in **basis points** (1–9999), where 10,000 bp = $1.00 USDC:
-
-| Price (bp) | Display | Buy collateral (1 share) | Sell collateral (1 share) |
-|------------|---------|--------------------------|---------------------------|
-| 5000       | 50.00¢  | 0.50 USDC                | 0.50 USDC                 |
-| 9000       | 90.00¢  | 0.90 USDC                | 0.10 USDC                 |
-| 1000       | 10.00¢  | 0.10 USDC                | 0.90 USDC                 |
 
 ### SPL Position Tokens
 
@@ -243,7 +233,7 @@ Where MM = 50% of initial margin. If the computed liquidation price falls below 
 
 ## Quadratic Voting for Settlement Disputes
 
-Derive implements a **quadratic voting** (QV) mechanism for resolving settlement disputes on-chain. This is used when the outcome of a market is contested — for example, when an oracle reports an ambiguous result.
+spruce.funimplements a **quadratic voting** (QV) mechanism for resolving settlement disputes on-chain. This is used when the outcome of a market is contested — for example, when an oracle reports an ambiguous result.
 
 ### How It Works
 
@@ -275,60 +265,9 @@ Derive implements a **quadratic voting** (QV) mechanism for resolving settlement
 
 ## Future Scope
 
-### Solana-Native Prediction Market — The Flagship Oracle
-
-The centerpiece of Derive's roadmap is building **Solana's native prediction market** — a first-class, fully on-chain prediction market that serves as the **flagship and official prediction market on Solana** and simultaneously acts as the **primary oracle for the perpetuals market**.
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                  DERIVE PREDICTION MARKET                         │
-│              (Solana's Native Prediction Market)                  │
-│                                                                  │
-│   ┌─────────────┐   ┌──────────────┐   ┌──────────────────┐     │
-│   │ Binary       │   │ Multi-outcome│   │ Scalar /         │     │
-│   │ Markets      │   │ Markets      │   │ Range Markets     │     │
-│   │ (Yes / No)   │   │ (N outcomes) │   │ (continuous)      │     │
-│   └──────┬───────┘   └──────┬───────┘   └────────┬─────────┘     │
-│          └──────────────────┼────────────────────┘               │
-│                             ▼                                    │
-│               ┌──────────────────────┐                           │
-│               │  Settlement Prices   │──────────┐                │
-│               │  (resolved outcomes) │          │                │
-│               └──────────────────────┘          │                │
-└──────────────────────────────────────────────────┼───────────────┘
-                                                   │
-                          Oracle Feed               │
-                                                   ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                    DERIVE PERPETUALS MARKET                       │
-│                                                                  │
-│   Settlement prices from the prediction market serve as the      │
-│   oracle for mark prices, funding rates, and liquidation         │
-│   triggers in the perpetuals engine.                             │
-│                                                                  │
-│   ┌───────────────────────────────────────────────────────┐      │
-│   │  Mark Price = Prediction Market Mid-Price              │      │
-│   │  Funding Rate = f(perp price − prediction market)      │      │
-│   │  Liquidation = triggered by prediction market oracle   │      │
-│   └───────────────────────────────────────────────────────┘      │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-**Why a prediction market as an oracle?**
-
-Traditional oracles rely on centralized data feeds or committee-based attestation. A prediction market oracle is fundamentally different — it derives truth from **skin-in-the-game consensus**. Traders who are wrong lose money; traders who are right profit. This economic incentive produces price signals that are more accurate and manipulation-resistant than any committee or API feed.
-
-| Traditional Oracle | Prediction Market Oracle |
-|---|---|
-| Committee signs a price | Thousands of traders price the outcome |
-| Single point of failure | Decentralized, permissionless |
-| Latency (periodic updates) | Continuous, real-time price discovery |
-| No cost to lie (until slashed) | Direct financial cost to being wrong |
-| Narrow data types | Any verifiable event can be a market |
-
 ### Quadratic Funding for Public Goods
 
-Beyond dispute resolution (quadratic voting), Derive will implement **quadratic funding (QF)** to bootstrap and sustain public goods within the ecosystem:
+Beyond dispute resolution (quadratic voting), spruce.funwill implement **quadratic funding (QF)** to bootstrap and sustain public goods within the ecosystem:
 
 - **Market Creation Grants** — Anyone can propose a new prediction market. A matching pool funded by protocol fees amplifies small contributions from many users, so niche but valuable markets get funded even without whale backing.
 - **Oracle Bounties** — Quadratic funding incentivizes community members to build and maintain resolution sources (data feeds, attestation networks) for market settlement.
@@ -352,12 +291,12 @@ This means 100 people each contributing $1 generates **far more** matching than 
 
 ### Gasless Trading via Solana Fee Sponsorship
 
-Trading on-chain means every order, cancellation, and claim costs transaction fees. For mainstream adoption, that friction has to disappear. Derive will integrate **transaction fee sponsorship** to cover fees for traders, making the experience feel as seamless as a centralized exchange.
+Trading on-chain means every order, cancellation, and claim costs transaction fees. For mainstream adoption, that friction has to disappear. spruce.funwill integrate **transaction fee sponsorship** to cover fees for traders, making the experience feel as seamless as a centralized exchange.
 
 ```
 ┌────────────┐      Signed Transaction      ┌──────────────┐
 │   Trader   │ ─────────────────────────▶  │   Fee Payer   │
-│  (no SOL   │   (signed intent,           │  (Derive      │
+│  (no SOL   │   (signed intent,           │  (spruce.fun     │
 │   needed)  │    no fee payment)           │   sponsors)   │
 └────────────┘                              └──────┬───────┘
                                                    │
@@ -371,7 +310,7 @@ Trading on-chain means every order, cancellation, and claim costs transaction fe
                           ▼                 ▼                  ▼
                   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
                   │  Fee Sponsor │  │  User Wallet  │  │  OnChain     │
-                  │  (Derive     │  │               │  │  OrderBook   │
+                  │  (spruce.fun    │  │               │  │  OrderBook   │
                   │   pays fees) │  │               │  │  Program     │
                   └──────────────┘  └──────────────┘  └──────────────┘
 ```
@@ -423,7 +362,7 @@ Trading on-chain means every order, cancellation, and claim costs transaction fe
 ## Project Structure
 
 ```
-derive/
+spruce.fun/
 ├── contracts/                 # Anchor smart contracts (Rust)
 │   └── solana/
 │       └── clob/              # On-chain CLOB program
@@ -472,8 +411,8 @@ derive/
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/your-org/derive.git
-cd derive
+git clone https://github.com/your-org/spruce.fun.git
+cd spruce.fun
 ```
 
 ### 2. Frontend
@@ -508,16 +447,24 @@ cargo run --release
 | Variable | Description |
 |----------|-------------|
 | `NEXT_PUBLIC_PRIVY_APP_ID` | Privy application ID |
-| `NEXT_PUBLIC_ORDERBOOK_PROGRAM_ID` | Deployed Anchor program ID |
+| `NEXT_PUBLIC_CLOB_PROGRAM_ID` | Deployed CLOB program ID (see [Deployed Contracts](#deployed-contracts)) |
+| `NEXT_PUBLIC_CLOB_MARGIN_POOL` | (Optional) Margin pool token account for leveraged orders |
 | `ANCHOR_WALLET` | Path to deployer keypair (for program deployment only) |
 
 ---
 
 ## Deployed Contracts
 
-| Program | Network | Address |
-|---------|---------|---------|
-| OnChainOrderBook | Solana Devnet | Coming soon |
+**Solana Devnet**
+
+| Contract | Address |
+|----------|---------|
+| **CLOB Program** | `3gHH4MLVgTtbFGeuX3LCPFeSEEY6kuRPwmTKzsrAdP7k` |
+| **Order Book (PDA)** | `DnrKJaYQv8NV5fTiL2zKhue7sPaefHvqB2TyzDEQtqG4` |
+| **USDC Mint (Devnet)** | `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU` |
+
+- **Order book PDA** is derived from seed `["orderbook"]` + program ID. Vault, LONG mint, and SHORT mint are PDAs derived from the order book. See `contracts/solana/clob/README.md` for init and deploy details.
+- Frontend default: `NEXT_PUBLIC_CLOB_PROGRAM_ID` is set to the CLOB program above in `frontend/lib/constants.ts`.
 
 ---
 

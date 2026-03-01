@@ -200,7 +200,7 @@ export async function placeLimitOrder(
       user: (program.provider as AnchorProvider).publicKey,
       tokenProgram: TOKEN_PROGRAM_ID,
     } as any)
-    .rpc();
+    .rpc({ commitment: 'processed', skipPreflight: false });
   return tx;
 }
 
@@ -222,7 +222,7 @@ export async function placeMarketOrder(
       user: (program.provider as AnchorProvider).publicKey,
       tokenProgram: TOKEN_PROGRAM_ID,
     } as any)
-    .rpc();
+    .rpc({ commitment: 'processed', skipPreflight: false });
   return tx;
 }
 
@@ -242,7 +242,7 @@ export async function cancelOrder(
       user: (program.provider as AnchorProvider).publicKey,
       tokenProgram: TOKEN_PROGRAM_ID,
     } as any)
-    .rpc();
+    .rpc({ commitment: 'processed', skipPreflight: false });
   return tx;
 }
 

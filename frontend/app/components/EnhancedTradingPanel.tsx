@@ -238,7 +238,7 @@ export default function EnhancedTradingPanel({
 
 
   return (
-    <div className="bg-white dark:bg-[#12161c] border border-gray-200 dark:border-[#1f2430] rounded-xl p-4">
+    <div className="bg-white dark:bg-[#12161c] border border-gray-200 dark:border-[#1f2430] rounded-xl p-4 min-h-[600px]">
       {/* Header: selected outcome (team) icon + name, or market icon + title for binary */}
       <div className="mb-3 flex items-center gap-2">
         {headerIcon && (
@@ -492,13 +492,6 @@ export default function EnhancedTradingPanel({
               : `${side === 'long' ? 'Long' : 'Short'} ${orderType === 'market' ? 'Market' : 'Limit'}`}
         </button>
 
-        <p className="text-xs text-gray-500 dark:text-[#8b94a3] text-center">
-          {CLOB_PROGRAM_ID ? (
-            <>Orders are placed on-chain (Solana). <Link href="/clob" className="text-blue-400 hover:underline">Open CLOB page</Link></>
-          ) : (
-            <>On-chain orders: <Link href="/clob" className="text-blue-400 hover:underline">Go to CLOB page</Link></>
-          )}
-        </p>
 
         {/* Message Display */}
         {message && (

@@ -22,9 +22,14 @@ interface AggLevel {
   traders: { address: string; qty: number }[];
 }
 
-export default function CLOBOrderBook() {
+interface CLOBOrderBookProps {
+  symbol?: string;
+  autoInitialize?: boolean;
+}
+
+export default function CLOBOrderBook({ symbol: _symbol, autoInitialize: _autoInitialize }: CLOBOrderBookProps) {
   const wallet = useWallet();
-  const { publicKey, connected } = wallet;
+  const { publicKey } = wallet;
   const [bids, setBids] = useState<AggLevel[]>([]);
   const [asks, setAsks] = useState<AggLevel[]>([]);
   const [isLoading, setIsLoading] = useState(true);

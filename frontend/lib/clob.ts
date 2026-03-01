@@ -124,7 +124,7 @@ export async function fetchOrderBook(connection: Connection): Promise<{
     return { buyOrders: [], sellOrders: [], tradeHistory: [], initialized: false };
   }
   const program = new Program(idl as any, { connection } as any);
-  const orderBook = await program.account.orderBook.fetch(orderBookPda).catch(() => null);
+  const orderBook = await (program.account as any).orderBook.fetch(orderBookPda).catch(() => null);
   if (!orderBook) {
     return { buyOrders: [], sellOrders: [], tradeHistory: [], initialized: false };
   }

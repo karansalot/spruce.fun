@@ -81,13 +81,8 @@ export default function Header({ activeCategory, onCategoryChange }: HeaderProps
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-3">
                 <Link href="/" className="flex items-center gap-1">
-                  <img
-                    src="/UpsilonLogo_page-0001-removebg-preview.png"
-                    alt="Derive"
-                    className="h-16 w-16 object-contain"
-                  />
                   <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                    Derive
+                    spruce.fun
                   </h1>
                 </Link>
               </div>

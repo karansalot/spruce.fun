@@ -616,7 +616,7 @@ export default function TeamSelector({
               <div className="px-2 pb-2 pt-1 bg-gray-50 dark:bg-[#0a0e14] border-t border-gray-200 dark:border-[#1a2332] max-h-[min(360px,50vh)] max-w-[50%] overflow-y-auto overflow-x-hidden min-w-0">
                 <div className="min-w-0">
                   <h4 className="text-xs font-semibold text-gray-500 dark:text-[#8b94a3] mb-2 px-1">
-                    Derive Orderbook — {team.name}
+                    spruce.fun Orderbook — {team.name}
                   </h4>
                   {clobSymbol ? (
                     <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-[#1a2332]">

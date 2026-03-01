@@ -5,7 +5,7 @@ import PrivyProviderWrapper from "./providers/PrivyProvider";
 import SolanaWalletProvider from "./providers/SolanaWalletProvider";
 
 export const metadata: Metadata = {
-  title: "Derive - On-Chain Trading",
+  title: "spruce.fun - On-Chain Trading",
   description: "Fully on-chain CLOB orderbook on Solana",
 };
 

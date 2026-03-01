@@ -17,7 +17,7 @@ import { CLOB_PROGRAM_ID, USDC_MINT_DEVNET } from '../../lib/constants';
 import { getAssociatedTokenAddressSync } from '@solana/spl-token';
 import { PublicKey } from '@solana/web3.js';
 
-export default function CLOBOrdersAndTrades() {
+export default function CLOBOrdersAndTrades({ symbol: _symbol }: { symbol?: string }) {
   const wallet = useWallet();
   const { publicKey, connected } = wallet;
   const [open, setOpen] = useState(false);
